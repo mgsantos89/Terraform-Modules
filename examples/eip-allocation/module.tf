@@ -1,6 +1,5 @@
 module "eip" {
-  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//EIP?ref=main"
-#
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EIP?ref=main"
 
   name = "${var.prefixo_projeto}-eip"
   
