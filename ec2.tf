@@ -11,8 +11,8 @@ module "ec2" {
   root_volume_size = 10
 
   tags = {
-    Environment = var.enviroment
-    Project     = var.project
+    Environment = var.environment
+    Project     = var.prefixo_projeto
     ManagedBy   = "Terraform"
   }
 }
