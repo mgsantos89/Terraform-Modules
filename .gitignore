@@ -1,0 +1,37 @@
+# Diretórios locais do Terraform (providers e módulos baixados)
+**/.terraform/*
+
+# Arquivos de state (podem conter dados sensíveis em texto puro)
+*.tfstate
+*.tfstate.*
+
+# Logs de crash
+crash.log
+crash.*.log
+
+# Arquivos de variáveis (podem conter valores sensíveis)
+*.tfvars
+*.tfvars.json
+# Exceção: arquivos de exemplo devem ser versionados
+!example.tfvars
+!**/example.tfvars
+
+# Arquivos de override (usados para ajustes locais)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Planos salvos
+*.tfplan
+tfplan
+
+# Configuração da CLI
+.terraformrc
+terraform.rc
+
+# Lock file: em repositório de módulos reutilizáveis não é versionado
+.terraform.lock.hcl
+
+# Configuração de provider local (credenciais/perfis)
+**/providers.tf
