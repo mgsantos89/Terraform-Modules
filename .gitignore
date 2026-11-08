@@ -1,5 +1,5 @@
 # Diretórios locais do Terraform (providers e módulos baixados)
-**/.terraform/*
+**/.terraform/
 
 # Arquivos de state (podem conter dados sensíveis em texto puro)
 *.tfstate

@@ -1,5 +1,5 @@
 module "ec2" {
-  source = "./EC2"
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
 
   name          = var.instance_name
   ami_id        = var.ami_id
