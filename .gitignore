@@ -35,3 +35,8 @@ terraform.rc
 
 # Configuração de provider local (credenciais/perfis)
 **/providers.tf
+
+# Chaves SSH / key pairs gerados localmente
+**/keys/
+*.pem
+*.key

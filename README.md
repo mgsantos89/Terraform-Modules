@@ -15,6 +15,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 | [`EC2`](./modules/EC2) | Instância EC2 com disco raiz `gp3` criptografado, security groups, key pair e tags | [`ec2-basic`](./examples/ec2-basic) |
 | [`EIP`](./modules/EIP) | Elastic IP (VPC), com associação opcional a uma instância EC2 | [`eip-allocation`](./examples/eip-allocation) |
 | [`SecurityGroup`](./modules/SecurityGroup) | Security Group com regras de entrada e saída declaradas por mapa (IPv4, IPv6, SG ou prefix list) | [`securitygroup-basic`](./examples/securitygroup-basic) |
+| [`KeyPair`](./modules/KeyPair) | Gera uma chave RSA 4096, registra o Key Pair na AWS e salva a chave privada `.pem` localmente | [`keypair-for-ec2`](./examples/keypair-for-ec2) |
 
 ### `EC2`
 
@@ -83,6 +84,24 @@ Cria um `aws_security_group` e uma regra `aws_vpc_security_group_ingress_rule` o
 
 **Outputs:** `security_group_id`, `security_group_name`, `security_group_arn`
 
+### `KeyPair`
+
+Gera uma chave RSA de 4096 bits (`tls_private_key`), registra a parte pública como `aws_key_pair` e grava a chave privada em um arquivo `.pem` local com permissão `0600` (`local_sensitive_file`).
+
+> 🔐 **A chave privada fica gravada no state em texto puro.** Ela é gerada pelo próprio Terraform, então qualquer pessoa com acesso ao `terraform.tfstate` consegue lê-la. Use este módulo para **laboratório e estudo**. Em ambientes reais, guarde o state em um backend remoto criptografado com acesso restrito (por exemplo S3 com SSE-KMS) ou prefira o SSM Session Manager em vez de SSH.
+
+**Providers usados:** `hashicorp/aws`, `hashicorp/tls`, `hashicorp/local`
+
+**Inputs**
+
+| Variável | Tipo | Padrão | Obrigatória | Descrição |
+|----------|------|--------|:-----------:|-----------|
+| `key_name` | `string` | — | ✅ | Nome do Key Pair na AWS |
+| `private_key_path` | `string` | `"keys/lab-key.pem"` | | Onde salvar o `.pem`, relativo à pasta em que você roda o Terraform |
+| `tags` | `map(string)` | `{}` | | Tags do Key Pair |
+
+**Outputs:** `key_name`, `key_pair_id`, `private_key_path` (caminho absoluto do `.pem`)
+
 ---
 
 ## 🚀 Como usar
@@ -106,12 +125,18 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 - [examples/ec2-basic](./examples/ec2-basic/README.md)
 - [examples/eip-allocation](./examples/eip-allocation/README.md)
 - [examples/securitygroup-basic](./examples/securitygroup-basic/README.md)
+- [examples/keypair-for-ec2](./examples/keypair-for-ec2/README.md)
 
 ### Combinando módulos
 
 Os outputs de um módulo podem ser usados como entrada de outro:
 
 ```hcl
+module "key_pair" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/KeyPair?ref=main"
+  # ...
+}
+
 module "sg" {
   source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/SecurityGroup?ref=main"
   # ...
@@ -121,6 +146,7 @@ module "ec2" {
   source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
   # ...
   security_group_ids = [module.sg.security_group_id]
+  key_name           = module.key_pair.key_name
 }
 
 module "eip" {
@@ -145,6 +171,10 @@ module "eip" {
 │   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
+│   ├── KeyPair/               # Módulo de Key Pair (chave SSH)
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
 │   └── SecurityGroup/         # Módulo de Security Group
 │       ├── main.tf
 │       ├── variables.tf
@@ -156,6 +186,11 @@ module "eip" {
 │   │   ├── example.tfvars
 │   │   └── README.md
 │   ├── eip-allocation/        # Exemplo de uso do módulo EIP
+│   │   ├── module.tf
+│   │   ├── variables.tf
+│   │   ├── example.tfvars
+│   │   └── README.md
+│   ├── keypair-for-ec2/       # Exemplo de uso do módulo KeyPair
 │   │   ├── module.tf
 │   │   ├── variables.tf
 │   │   ├── example.tfvars
@@ -179,13 +214,15 @@ O [`.gitignore`](./.gitignore) impede que estes arquivos sejam versionados, porq
 | `*.tfvars` (exceto `example.tfvars`) | Valores reais das variáveis, por exemplo um `local.tfvars` |
 | `*.tfstate`, `*.tfstate.*` | State do Terraform |
 | `.terraform/`, `.terraform.lock.hcl` | Providers e módulos baixados pelo `terraform init` |
+| `keys/`, `*.pem`, `*.key` | Chaves privadas geradas pelo módulo `KeyPair` |
 
 ---
 
 ## ✅ Requisitos
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.5`
-- Provider [`hashicorp/aws`](https://registry.terraform.io/providers/hashicorp/aws/latest) `5.x` (testado com `5.38.0`)
+- Provider [`hashicorp/aws`](https://registry.terraform.io/providers/hashicorp/aws/latest): exemplos rodados com `5.38.0` (EC2, EIP) e `6.72.0` (KeyPair)
+- Providers [`hashicorp/tls`](https://registry.terraform.io/providers/hashicorp/tls/latest) e [`hashicorp/local`](https://registry.terraform.io/providers/hashicorp/local/latest), apenas para o módulo `KeyPair`
 - Credenciais AWS configuradas (`aws configure`, `AWS_PROFILE` ou variáveis de ambiente)
 - Uma VPC existente, com subnet para a instância EC2
 
