@@ -14,6 +14,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 |--------|-----------|---------|
 | [`EC2`](./modules/EC2) | Instância EC2 com disco raiz `gp3` criptografado, security groups, key pair e tags | [`ec2-basic`](./examples/ec2-basic) |
 | [`EIP`](./modules/EIP) | Elastic IP (VPC), com associação opcional a uma instância EC2 | [`eip-allocation`](./examples/eip-allocation) |
+| [`SecurityGroup`](./modules/SecurityGroup) | Security Group com regras de entrada e saída declaradas por mapa (IPv4, IPv6, SG ou prefix list) | [`securitygroup-basic`](./examples/securitygroup-basic) |
 
 ### `EC2`
 
@@ -49,6 +50,39 @@ Cria um `aws_eip` no domínio `vpc`. Se `instance_id` for informado, também cri
 
 **Outputs:** `allocation_id`, `public_ip`, `association_id` (`null` quando não há associação)
 
+### `SecurityGroup`
+
+Cria um `aws_security_group` e uma regra `aws_vpc_security_group_ingress_rule` ou `aws_vpc_security_group_egress_rule` para cada item dos mapas `ingress_rules` e `egress_rules`. Usa `create_before_destroy`, então trocar o grupo não deixa recursos sem Security Group no meio do caminho.
+
+> ⚠️ **Não existe saída liberada por padrão.** A AWS cria todo Security Group com uma regra que libera toda a saída, mas o Terraform remove essa regra. Se `egress_rules` ficar vazio, **nenhum tráfego de saída é permitido**.
+
+**Inputs**
+
+| Variável | Tipo | Padrão | Obrigatória | Descrição |
+|----------|------|--------|:-----------:|-----------|
+| `name` | `string` | — | ✅ | Nome do Security Group (tag `Name`) |
+| `vpc_id` | `string` | — | ✅ | ID da VPC |
+| `description` | `string` | `"Managed by Terraform"` | | Descrição do grupo. Mudar este valor recria o grupo |
+| `ingress_rules` | `map(object)` | `{}` | | Regras de entrada (formato abaixo) |
+| `egress_rules` | `map(object)` | `{}` | | Regras de saída (formato abaixo) |
+| `tags` | `map(string)` | `{}` | | Tags aplicadas ao grupo e às regras |
+
+**Formato de cada regra**
+
+| Campo | Obrigatório | Descrição |
+|-------|:-----------:|-----------|
+| `ip_protocol` | ✅ | `tcp`, `udp`, `icmp`, `icmpv6` ou `-1` (todos) |
+| `from_port` / `to_port` | | Intervalo de portas. **Omita** quando `ip_protocol = "-1"` |
+| `description` | | Descrição da regra |
+| `cidr_ipv4` | ⚠️ | CIDR IPv4 de origem ou destino |
+| `cidr_ipv6` | ⚠️ | CIDR IPv6 de origem ou destino |
+| `referenced_security_group_id` | ⚠️ | ID de outro Security Group |
+| `prefix_list_id` | ⚠️ | ID de uma managed prefix list |
+
+⚠️ Informe **exatamente um** dos quatro campos de origem/destino em cada regra.
+
+**Outputs:** `security_group_id`, `security_group_name`, `security_group_arn`
+
 ---
 
 ## 🚀 Como usar
@@ -71,6 +105,30 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 
 - [examples/ec2-basic](./examples/ec2-basic/README.md)
 - [examples/eip-allocation](./examples/eip-allocation/README.md)
+- [examples/securitygroup-basic](./examples/securitygroup-basic/README.md)
+
+### Combinando módulos
+
+Os outputs de um módulo podem ser usados como entrada de outro:
+
+```hcl
+module "sg" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/SecurityGroup?ref=main"
+  # ...
+}
+
+module "ec2" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
+  # ...
+  security_group_ids = [module.sg.security_group_id]
+}
+
+module "eip" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EIP?ref=main"
+  # ...
+  instance_id = module.ec2.instance_id
+}
+```
 
 ---
 
@@ -83,7 +141,11 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 │   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
-│   └── EIP/                   # Módulo de Elastic IP
+│   ├── EIP/                   # Módulo de Elastic IP
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── SecurityGroup/         # Módulo de Security Group
 │       ├── main.tf
 │       ├── variables.tf
 │       └── outputs.tf
@@ -93,7 +155,12 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 │   │   ├── variables.tf
 │   │   ├── example.tfvars
 │   │   └── README.md
-│   └── eip-allocation/        # Exemplo de uso do módulo EIP
+│   ├── eip-allocation/        # Exemplo de uso do módulo EIP
+│   │   ├── module.tf
+│   │   ├── variables.tf
+│   │   ├── example.tfvars
+│   │   └── README.md
+│   └── securitygroup-basic/   # Exemplo de uso do módulo SecurityGroup
 │       ├── module.tf
 │       ├── variables.tf
 │       ├── example.tfvars
@@ -120,7 +187,7 @@ O [`.gitignore`](./.gitignore) impede que estes arquivos sejam versionados, porq
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.5`
 - Provider [`hashicorp/aws`](https://registry.terraform.io/providers/hashicorp/aws/latest) `5.x` (testado com `5.38.0`)
 - Credenciais AWS configuradas (`aws configure`, `AWS_PROFILE` ou variáveis de ambiente)
-- Uma VPC com subnet existente para a instância EC2
+- Uma VPC existente, com subnet para a instância EC2
 
 ---
 
