@@ -16,6 +16,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 | [`EIP`](./modules/EIP) | Elastic IP (VPC), com associação opcional a uma instância EC2 | [`eip-allocation`](./examples/eip-allocation) |
 | [`SecurityGroup`](./modules/SecurityGroup) | Security Group com regras de entrada e saída declaradas por mapa (IPv4, IPv6, SG ou prefix list) | [`securitygroup-basic`](./examples/securitygroup-basic) |
 | [`KeyPair`](./modules/KeyPair) | Gera uma chave RSA 4096, registra o Key Pair na AWS e salva a chave privada `.pem` localmente | [`keypair-for-ec2`](./examples/keypair-for-ec2) |
+| [`PlacementGroup`](./modules/PlacementGroup) | Placement Group com estratégia `cluster`, `spread` ou `partition` | [`placementgroups`](./examples/placementgroups) |
 
 ### `EC2`
 
@@ -102,6 +103,30 @@ Gera uma chave RSA de 4096 bits (`tls_private_key`), registra a parte pública c
 
 **Outputs:** `key_name`, `key_pair_id`, `private_key_path` (caminho absoluto do `.pem`)
 
+### `PlacementGroup`
+
+Cria um `aws_placement_group`, que controla como a AWS distribui as instâncias EC2 no hardware físico. Os campos `partition_count` e `spread_level` só são enviados quando valem para a estratégia escolhida.
+
+| Estratégia | Como distribui as instâncias | Quando usar |
+|------------|------------------------------|-------------|
+| `cluster` | Juntas, no mesmo rack e na mesma AZ | Baixa latência e alta banda entre instâncias (HPC, big data) |
+| `spread` | Cada instância em um hardware diferente (até 7 por AZ) | Poucas instâncias críticas que não podem falhar juntas |
+| `partition` | Em partições com racks separados (até 7 por AZ) | Sistemas distribuídos grandes: Kafka, Cassandra, HDFS |
+
+**Inputs**
+
+| Variável | Tipo | Padrão | Obrigatória | Descrição |
+|----------|------|--------|:-----------:|-----------|
+| `name` | `string` | — | ✅ | Nome do Placement Group, único na região (tag `Name`) |
+| `strategy` | `string` | — | ✅ | `cluster`, `spread` ou `partition` |
+| `partition_count` | `number` | `null` | | Número de partições (1 a 7). Só vale para `partition`. Se ficar `null`, a AWS usa 2 |
+| `spread_level` | `string` | `"rack"` | | `rack` ou `host`. Só vale para `spread`. `host` só funciona em AWS Outposts |
+| `tags` | `map(string)` | `{}` | | Tags adicionais |
+
+**Outputs:** `placement_group_id`, `placement_group_arn`, `placement_group_name`, `placement_group_strategy`
+
+> ℹ️ O módulo `EC2` ainda não aceita placement group. Por enquanto, para colocar uma instância no grupo é preciso usar um `aws_instance` direto, com `placement_group = module.<nome>.placement_group_name`.
+
 ---
 
 ## 🚀 Como usar
@@ -126,6 +151,7 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 - [examples/eip-allocation](./examples/eip-allocation/README.md)
 - [examples/securitygroup-basic](./examples/securitygroup-basic/README.md)
 - [examples/keypair-for-ec2](./examples/keypair-for-ec2/README.md)
+- [examples/placementgroups](./examples/placementgroups/README.md)
 
 ### Combinando módulos
 
@@ -175,6 +201,10 @@ module "eip" {
 │   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
+│   ├── PlacementGroup/        # Módulo de Placement Group
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
 │   └── SecurityGroup/         # Módulo de Security Group
 │       ├── main.tf
 │       ├── variables.tf
@@ -191,6 +221,11 @@ module "eip" {
 │   │   ├── example.tfvars
 │   │   └── README.md
 │   ├── keypair-for-ec2/       # Exemplo de uso do módulo KeyPair
+│   │   ├── module.tf
+│   │   ├── variables.tf
+│   │   ├── example.tfvars
+│   │   └── README.md
+│   ├── placementgroups/       # Exemplo de uso do módulo PlacementGroup
 │   │   ├── module.tf
 │   │   ├── variables.tf
 │   │   ├── example.tfvars
@@ -221,7 +256,7 @@ O [`.gitignore`](./.gitignore) impede que estes arquivos sejam versionados, porq
 ## ✅ Requisitos
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.5`
-- Provider [`hashicorp/aws`](https://registry.terraform.io/providers/hashicorp/aws/latest): exemplos rodados com `5.38.0` (EC2, EIP) e `6.72.0` (KeyPair)
+- Provider [`hashicorp/aws`](https://registry.terraform.io/providers/hashicorp/aws/latest): exemplos rodados com `5.38.0` (EC2, EIP) e `6.72.0` (KeyPair, PlacementGroup)
 - Providers [`hashicorp/tls`](https://registry.terraform.io/providers/hashicorp/tls/latest) e [`hashicorp/local`](https://registry.terraform.io/providers/hashicorp/local/latest), apenas para o módulo `KeyPair`
 - Credenciais AWS configuradas (`aws configure`, `AWS_PROFILE` ou variáveis de ambiente)
 - Uma VPC existente, com subnet para a instância EC2
