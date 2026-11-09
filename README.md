@@ -35,8 +35,12 @@ Cria uma `aws_instance` com volume raiz `gp3`, criptografado e removido junto co
 | `key_name` | `string` | `null` | | Nome do key pair para acesso SSH |
 | `root_volume_size` | `number` | `8` | | Tamanho do disco raiz em GB |
 | `tags` | `map(string)` | `{}` | | Tags adicionais |
+| `placement_group` | `string` | `null` | | Nome do Placement Group onde a instância será criada |
+| `placement_partition_number` | `number` | `null` | | Partição (1 a 7). Só para grupos `partition` e exige `placement_group` |
 
-**Outputs:** `instance_id`, `public_ip`, `private_ip`
+**Outputs:** `instance_id`, `public_ip`, `private_ip`, `placement_group`
+
+> ⚠️ Informar `placement_group` em uma instância **que já existe** pode recriá-la. Confira o `plan` antes do `apply`.
 
 ### `EIP`
 
@@ -125,7 +129,7 @@ Cria um `aws_placement_group`, que controla como a AWS distribui as instâncias 
 
 **Outputs:** `placement_group_id`, `placement_group_arn`, `placement_group_name`, `placement_group_strategy`
 
-> ℹ️ O módulo `EC2` ainda não aceita placement group. Por enquanto, para colocar uma instância no grupo é preciso usar um `aws_instance` direto, com `placement_group = module.<nome>.placement_group_name`.
+> 💡 Para colocar uma instância no grupo, passe `placement_group = module.<nome>.placement_group_name` para o módulo `EC2`.
 
 ---
 
@@ -168,11 +172,17 @@ module "sg" {
   # ...
 }
 
+module "pg" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/PlacementGroup?ref=main"
+  # ...
+}
+
 module "ec2" {
   source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
   # ...
   security_group_ids = [module.sg.security_group_id]
   key_name           = module.key_pair.key_name
+  placement_group    = module.pg.placement_group_name
 }
 
 module "eip" {

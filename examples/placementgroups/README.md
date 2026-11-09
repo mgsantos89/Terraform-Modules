@@ -183,38 +183,62 @@ A AWS não permite alterar um Placement Group. Mudar `strategy`, `partition_coun
 
 ## 🔗 Usando com instâncias EC2
 
-> ℹ️ O módulo [`EC2`](../../modules/EC2) deste repositório **ainda não aceita placement group**. Por enquanto, use um `aws_instance` direto.
+Passe o output `placement_group_name` para o módulo [`EC2`](../../modules/EC2), na variável `placement_group`.
 
 Instâncias em um grupo `cluster`:
 
 ```hcl
-resource "aws_instance" "hpc" {
-  count = 3
+module "ec2_hpc" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
+  count  = 3
 
-  ami             = var.ami_id
-  instance_type   = "c5n.large"
-  subnet_id       = var.subnet_id
+  name          = "${var.prefixo_projeto}-hpc-${count.index}"
+  ami_id        = var.ami_id
+  instance_type = "c5n.large"
+  subnet_id     = var.subnet_id
+
   placement_group = module.placement_group_1.placement_group_name
+}
+```
 
-  tags = { Name = "${var.prefixo_projeto}-hpc-${count.index}" }
+Instâncias em um grupo `spread`, cada uma em um rack diferente:
+
+```hcl
+module "ec2_critical" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
+  count  = 2
+
+  name      = "${var.prefixo_projeto}-critical-${count.index}"
+  ami_id    = var.ami_id
+  subnet_id = var.subnet_id
+
+  placement_group = module.placement_group_2.placement_group_name
 }
 ```
 
 Instâncias em um grupo `partition`, escolhendo a partição:
 
 ```hcl
-resource "aws_instance" "kafka" {
-  count = 2
+module "ec2_kafka" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/EC2?ref=main"
+  count  = 2
 
-  ami                        = var.ami_id
-  instance_type              = "m5.large"
-  subnet_id                  = var.subnet_id
+  name          = "${var.prefixo_projeto}-kafka-${count.index}"
+  ami_id        = var.ami_id
+  instance_type = "m5.large"
+  subnet_id     = var.subnet_id
+
   placement_group            = module.placement_group_3.placement_group_name
   placement_partition_number = count.index + 1 # partição 1, 2...
-
-  tags = { Name = "${var.prefixo_projeto}-kafka-${count.index}" }
 }
 ```
+
+| Variável do módulo `EC2` | Descrição |
+|--------------------------|-----------|
+| `placement_group` | Nome do grupo. Se ficar `null` (padrão), a instância é criada fora de qualquer grupo |
+| `placement_partition_number` | Partição de 1 a 7. Só para grupos `partition`. Se for informada sem `placement_group`, o `plan` falha com erro |
+
+> ⚠️ Adicionar ou trocar o `placement_group` de uma instância **que já existe** pode recriá-la. Confira o `plan` antes do `apply`.
 
 > Nem todo tipo de instância é aceito em todas as estratégias. Tipos burstable (`t2`, `t3`...) não podem ser usados em `cluster`, por exemplo. Consulte a [documentação da AWS](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html).
 

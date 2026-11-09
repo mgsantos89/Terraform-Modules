@@ -8,6 +8,9 @@ resource "aws_instance" "this" {
   vpc_security_group_ids = var.security_group_ids
   key_name               = var.key_name
 
+  placement_group            = var.placement_group
+  placement_partition_number = var.placement_partition_number
+
   root_block_device {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
@@ -18,4 +21,11 @@ resource "aws_instance" "this" {
   tags = merge(var.tags, {
     Name = var.name
   })
+
+  lifecycle {
+    precondition {
+      condition     = var.placement_partition_number == null || var.placement_group != null
+      error_message = "placement_partition_number exige que placement_group seja informado."
+    }
+  }
 }

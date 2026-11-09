@@ -40,3 +40,22 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "placement_group" {
+  description = "Nome do Placement Group onde a instância será criada"
+  type        = string
+  default     = null
+}
+
+variable "placement_partition_number" {
+  description = "Número da partição (somente para Placement Group com estratégia partition)"
+  type        = number
+  default     = null
+
+  validation {
+    condition = var.placement_partition_number == null ? true : (
+      var.placement_partition_number >= 1 && var.placement_partition_number <= 7
+    )
+    error_message = "placement_partition_number deve estar entre 1 e 7."
+  }
+}
