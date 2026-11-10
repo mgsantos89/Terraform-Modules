@@ -12,7 +12,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 
 | Módulo | Descrição | Exemplo |
 |--------|-----------|---------|
-| [`EC2`](./modules/EC2) | Instância EC2 com disco raiz `gp3` criptografado, security groups, key pair e tags | [`ec2-basic`](./examples/ec2-basic) |
+| [`EC2`](./modules/EC2) | Instância EC2 com disco raiz `gp3` criptografado, IMDSv2, User Data, security groups, key pair e tags | [`ec2-basic`](./examples/ec2-basic), [`ec2-user-data`](./examples/ec2-user-data) |
 | [`EIP`](./modules/EIP) | Elastic IP (VPC), com associação opcional a uma instância EC2 | [`eip-allocation`](./examples/eip-allocation) |
 | [`SecurityGroup`](./modules/SecurityGroup) | Security Group com regras de entrada e saída declaradas por mapa (IPv4, IPv6, SG ou prefix list) | [`securitygroup-basic`](./examples/securitygroup-basic) |
 | [`KeyPair`](./modules/KeyPair) | Gera uma chave RSA 4096, registra o Key Pair na AWS e salva a chave privada `.pem` localmente | [`keypair-for-ec2`](./examples/keypair-for-ec2) |
@@ -20,7 +20,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 
 ### `EC2`
 
-Cria uma `aws_instance` com volume raiz `gp3`, criptografado e removido junto com a instância.
+Cria uma `aws_instance` com volume raiz `gp3`, criptografado e removido junto com a instância. O IMDSv2 é obrigatório por padrão e há suporte opcional a User Data.
 
 **Inputs**
 
@@ -37,10 +37,17 @@ Cria uma `aws_instance` com volume raiz `gp3`, criptografado e removido junto co
 | `tags` | `map(string)` | `{}` | | Tags adicionais |
 | `placement_group` | `string` | `null` | | Nome do Placement Group onde a instância será criada |
 | `placement_partition_number` | `number` | `null` | | Partição (1 a 7). Só para grupos `partition` e exige `placement_group` |
+| `user_data` | `string` | `null` | | Script de User Data em texto puro. Não use junto com `user_data_base64` |
+| `user_data_base64` | `string` | `null` | | User Data já codificado em base64 (ex.: `cloudinit_config` com gzip) |
+| `user_data_replace_on_change` | `bool` | `false` | | Recria a instância quando o User Data muda |
+| `metadata_http_tokens` | `string` | `"required"` | | `"required"` exige IMDSv2; `"optional"` aceita também IMDSv1 |
+| `metadata_http_put_response_hop_limit` | `number` | `1` | | Hop limit do IMDS (1 a 64). Use `2` para containers |
 
 **Outputs:** `instance_id`, `public_ip`, `private_ip`, `placement_group`
 
 > ⚠️ Informar `placement_group` em uma instância **que já existe** pode recriá-la. Confira o `plan` antes do `apply`.
+
+> 🔐 Não coloque segredos no User Data: ele fica em texto no state e visível na metadata da instância. Use SSM Parameter Store ou Secrets Manager.
 
 ### `EIP`
 
@@ -152,6 +159,7 @@ module "ec2" {
 O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`) está no README de cada exemplo:
 
 - [examples/ec2-basic](./examples/ec2-basic/README.md)
+- [examples/ec2-user-data](./examples/ec2-user-data/README.md)
 - [examples/eip-allocation](./examples/eip-allocation/README.md)
 - [examples/securitygroup-basic](./examples/securitygroup-basic/README.md)
 - [examples/keypair-for-ec2](./examples/keypair-for-ec2/README.md)
@@ -224,6 +232,14 @@ module "eip" {
 │   │   ├── module.tf
 │   │   ├── variables.tf
 │   │   ├── example.tfvars
+│   │   └── README.md
+│   ├── ec2-user-data/         # Exemplo do módulo EC2 com User Data e IMDSv2
+│   │   ├── module.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   ├── example.tfvars
+│   │   ├── scripts/
+│   │   │   └── user-data.sh.tftpl
 │   │   └── README.md
 │   ├── eip-allocation/        # Exemplo de uso do módulo EIP
 │   │   ├── module.tf
