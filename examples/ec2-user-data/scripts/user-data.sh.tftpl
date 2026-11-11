@@ -1,0 +1,26 @@
+#!/bin/bash
+# User Data de exemplo para Ubuntu (24.04 / 22.04).
+# Roda uma única vez, como root, no primeiro boot da instância.
+# Log de execução: /var/log/cloud-init-output.log
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y nginx curl
+
+# Lê dados da instância usando IMDSv2 (token obrigatório)
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-id)
+AZ=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/availability-zone)
+
+cat > /var/www/html/index.html <<EOF
+<h1>${instance_name}</h1>
+<p>Ambiente: ${environment}</p>
+<p>Instance ID: $INSTANCE_ID</p>
+<p>AZ: $AZ</p>
+EOF
+
+systemctl enable --now nginx
