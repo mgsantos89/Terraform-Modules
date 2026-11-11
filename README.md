@@ -17,6 +17,7 @@ O objetivo é ter blocos de infraestrutura pequenos, documentados e prontos para
 | [`SecurityGroup`](./modules/SecurityGroup) | Security Group com regras de entrada e saída declaradas por mapa (IPv4, IPv6, SG ou prefix list) | [`securitygroup-basic`](./examples/securitygroup-basic) |
 | [`KeyPair`](./modules/KeyPair) | Gera uma chave RSA 4096, registra o Key Pair na AWS e salva a chave privada `.pem` localmente | [`keypair-for-ec2`](./examples/keypair-for-ec2) |
 | [`PlacementGroup`](./modules/PlacementGroup) | Placement Group com estratégia `cluster`, `spread` ou `partition` | [`placementgroups`](./examples/placementgroups) |
+| [`ENI`](./modules/ENI) | Elastic Network Interface com IPs privados opcionais, security groups e anexo opcional a uma instância EC2 | [`eni`](./examples/eni) |
 
 ### `EC2`
 
@@ -138,6 +139,28 @@ Cria um `aws_placement_group`, que controla como a AWS distribui as instâncias 
 
 > 💡 Para colocar uma instância no grupo, passe `placement_group = module.<nome>.placement_group_name` para o módulo `EC2`.
 
+### `ENI`
+
+Cria uma `aws_network_interface`. Se `instance_id` for informado, também cria o `aws_network_interface_attachment` para anexá-la como interface secundária.
+
+**Inputs**
+
+| Variável | Tipo | Padrão | Obrigatória | Descrição |
+|----------|------|--------|:-----------:|-----------|
+| `name` | `string` | — | ✅ | Nome da ENI (tag `Name`) |
+| `subnet_id` | `string` | — | ✅ | ID da subnet onde a ENI será criada |
+| `description` | `string` | `"Managed by Terraform"` | | Descrição da ENI |
+| `private_ips` | `list(string)` | `null` | | IPs privados fixos. Se ficar `null`, a AWS escolhe um IP livre da subnet |
+| `security_group_ids` | `list(string)` | `[]` | | IDs dos security groups. Vazio usa o Security Group default da VPC |
+| `source_dest_check` | `bool` | `true` | | Verificação de origem/destino. Use `false` para NAT, firewall ou roteador |
+| `instance_id` | `string` | `null` | | ID da instância EC2 a anexar. Se ficar `null`, a ENI só é criada |
+| `device_index` | `number` | `1` | | Posição da interface na instância. Precisa ser `>= 1` (a `0` é a primária) |
+| `tags` | `map(string)` | `{}` | | Tags adicionais |
+
+**Outputs:** `eni_id`, `eni_arn`, `mac_address`, `private_ips`, `private_dns_name`, `attachment_id` (`null` quando não há anexo)
+
+> ⚠️ A instância e a subnet da ENI precisam estar na **mesma AZ**.
+
 ---
 
 ## 🚀 Como usar
@@ -164,6 +187,7 @@ O passo a passo completo (provider, variáveis, `init`/`plan`/`apply`/`destroy`)
 - [examples/securitygroup-basic](./examples/securitygroup-basic/README.md)
 - [examples/keypair-for-ec2](./examples/keypair-for-ec2/README.md)
 - [examples/placementgroups](./examples/placementgroups/README.md)
+- [examples/eni](./examples/eni/README.md)
 
 ### Combinando módulos
 
@@ -198,6 +222,13 @@ module "eip" {
   # ...
   instance_id = module.ec2.instance_id
 }
+
+module "eni" {
+  source = "git::https://github.com/mgsantos89/Terraform-Modules.git//modules/ENI?ref=main"
+  # ...
+  security_group_ids = [module.sg.security_group_id]
+  instance_id        = module.ec2.instance_id
+}
 ```
 
 ---
@@ -212,6 +243,10 @@ module "eip" {
 │   │   ├── variables.tf
 │   │   └── outputs.tf
 │   ├── EIP/                   # Módulo de Elastic IP
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── ENI/                   # Módulo de Elastic Network Interface
 │   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
@@ -242,6 +277,11 @@ module "eip" {
 │   │   │   └── user-data.sh.tftpl
 │   │   └── README.md
 │   ├── eip-allocation/        # Exemplo de uso do módulo EIP
+│   │   ├── module.tf
+│   │   ├── variables.tf
+│   │   ├── example.tfvars
+│   │   └── README.md
+│   ├── eni/                   # Exemplo de uso do módulo ENI
 │   │   ├── module.tf
 │   │   ├── variables.tf
 │   │   ├── example.tfvars
